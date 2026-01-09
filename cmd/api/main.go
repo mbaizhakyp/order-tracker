@@ -32,12 +32,21 @@ func main() {
 	orderSvc := service.NewOrderService(orderRepo, kafkaPublisher)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 
+	locationRepo, err := repository.NewRedisLocationRepository(cfg.Redis.Addr)
+	if err != nil {
+		log.Fatalf("failed to setup redis: %v", err)
+	}
+	locationSvc := service.NewLocationService(locationRepo)
+	locationHandler := handler.NewLocationHandler(locationSvc)
+
 	// 4. Setup Router
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/orders", orderHandler.CreateOrder)
 		v1.GET("/orders/:id", orderHandler.GetOrder)
+
+		v1.POST("/location", locationHandler.UpdateLocation)
 	}
 
 	// 5. Run Server
