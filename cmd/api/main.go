@@ -8,6 +8,7 @@ import (
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/event"
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/handler"
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/repository"
+	websocket_internal "github.com/mbaizhakyp/order-tracker/internal/adapters/websocket"
 	"github.com/mbaizhakyp/order-tracker/internal/core/config"
 	"github.com/mbaizhakyp/order-tracker/internal/core/service"
 )
