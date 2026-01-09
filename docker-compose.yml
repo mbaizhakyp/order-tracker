@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Primary Database with PostGIS
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: order_tracker_db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=order_tracker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Real-time Data & Locking
+  redis:
+    image: redis:7-alpine
+    container_name: order_tracker_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Event Streaming (Redpanda - Kafka compatible, lightweight)
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: order_tracker_kafka
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAIN://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAIN://redpanda:29092,OUTSIDE://localhost:9092
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: [ "CMD-SHELL", "rpk cluster health | grep -q 'Healthy: true'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+  redpanda_data:

@@ -1,0 +1,12 @@
+server:
+  port: ":8080"
+
+database:
+  dsn: "postgres://postgres:postgres@localhost:5433/order_tracker?sslmode=disable"
+
+redis:
+  addr: "localhost:6379"
+
+kafka:
+  brokers:
+    - "localhost:9092"
