@@ -23,6 +23,14 @@ func (m *MockLocationRepo) UpdateShopperLocation(ctx context.Context, loc *entit
 	return args.Error(0)
 }
 
+func (m *MockLocationRepo) GetShoppersWithinRadius(ctx context.Context, lat, lng, radiusKm float64) ([]entity.ShopperLocation, error) {
+	args := m.Called(ctx, lat, lng, radiusKm)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]entity.ShopperLocation), args.Error(1)
+}
+
 // --- Tests ---
 
 func TestUpdateLocation(t *testing.T) {
