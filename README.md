@@ -42,6 +42,9 @@ graph TD
     API -->|GeoAdd| Redis
 ```
 
+### Database Schema (ERD)
+![Database ERD](assets/erd.png)
+
 ### Dispatch Flow Sequence
 ```mermaid
 sequenceDiagram
