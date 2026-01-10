@@ -61,13 +61,45 @@ func (c *WebSocketConsumer) processMessage(ctx context.Context, m kafka.Message)
 
 		log.Printf("[WS-Consumer] Received OFFER_CREATED for Shopper %s", offer.ShopperID)
 
+		// Prepare Map to merge Offer fields + Payload (coords)
+		finalPayload := make(map[string]interface{})
+
+		// 1. Add Offer fields (using JSON struct tags would be cleaner, but manual map is fine for now)
+		// Or just re-marshal offer to map
+		offerBytes, _ := json.Marshal(offer)
+		_ = json.Unmarshal(offerBytes, &finalPayload)
+
+		// 2. Add Payload fields (Coords)
+		if len(envelope.Payload) > 0 {
+			var extraData map[string]interface{}
+			if err := json.Unmarshal(envelope.Payload, &extraData); err == nil {
+				for k, v := range extraData {
+					finalPayload[k] = v
+				}
+			}
+		}
+
 		// Push to Shopper via Hub
-		// We send the whole raw envelope or just the offer. Let's send a nice UI-ready message.
 		msg := map[string]interface{}{
 			"type":    "NEW_OFFER",
-			"payload": offer,
+			"payload": finalPayload,
 		}
 		c.hub.SendToUser(offer.ShopperID.String(), msg)
+	} else if envelope.Type == "SHOPPER_MOVED" {
+		// Just pass the whole thing to frontend
+		// Data is { "shopper_id": ..., "lat": ..., "lng": ... }
+		var locationData map[string]interface{}
+		if err := json.Unmarshal(envelope.Data, &locationData); err != nil {
+			return fmt.Errorf("failed to unmarshal location data: %w", err)
+		}
+
+		msg := map[string]interface{}{
+			"type":    "SHOPPER_MOVED",
+			"payload": locationData,
+		}
+		// Broadcast to ALL users (simple MVP approach)
+		// Frontend will filter by ShopperID matching their order
+		c.hub.Broadcast(msg)
 	}
 
 	return nil

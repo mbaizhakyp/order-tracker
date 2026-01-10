@@ -81,3 +81,12 @@ func (h *Hub) SendToUser(userID string, message interface{}) {
 		// log.Printf("[WS] User %s not connected, message dropped (or push notif)", userID)
 	}
 }
+
+func (h *Hub) Broadcast(message interface{}) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, client := range h.clients {
+		client.SendJSON(message)
+	}
+}

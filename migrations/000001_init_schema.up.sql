@@ -13,6 +13,9 @@ CREATE TABLE stores (
     name TEXT NOT NULL,
     location GEOMETRY(POINT, 4326) NOT NULL
 );
+INSERT INTO stores (id, name, location) VALUES
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Downtown Grocery', ST_SetSRID(ST_MakePoint(-87.5692, 33.2098), 4326))
+ON CONFLICT DO NOTHING;
 CREATE INDEX idx_stores_location ON stores USING GIST (location);
 
 CREATE TABLE orders (

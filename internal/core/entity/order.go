@@ -31,6 +31,8 @@ type Order struct {
 	Status      OrderStatus     `json:"status"`
 	TotalAmount int64           `json:"total_amount"` // In cents
 	Items       json.RawMessage `json:"items"`        // JSONB: []OrderItem
+	DeliveryLat float64         `json:"delivery_lat"`
+	DeliveryLng float64         `json:"delivery_lng"`
 	CreatedAt   time.Time       `json:"created_at"`
 }
 

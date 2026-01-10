@@ -21,8 +21,8 @@ func NewPostgresOrderRepository(db *pgxpool.Pool) ports.OrderRepository {
 
 func (r *PostgresOrderRepository) Create(ctx context.Context, order *entity.Order) error {
 	query := `
-		INSERT INTO orders (id, customer_id, store_id, status, total_amount, items, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO orders (id, customer_id, store_id, status, total_amount, items, delivery_lat, delivery_lng, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	// Ensure ID is generated if empty
 	if order.ID == uuid.Nil {
@@ -42,6 +42,8 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entity.Orde
 		order.Status,
 		order.TotalAmount,
 		order.Items,
+		order.DeliveryLat,
+		order.DeliveryLng,
 		order.CreatedAt,
 	)
 	return err
@@ -49,7 +51,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entity.Orde
 
 func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.Order, error) {
 	query := `
-		SELECT id, customer_id, store_id, shopper_id, status, total_amount, items, created_at
+		SELECT id, customer_id, store_id, shopper_id, status, total_amount, items, delivery_lat, delivery_lng, created_at
 		FROM orders
 		WHERE id = $1
 	`
@@ -69,6 +71,8 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 		&order.Status,
 		&order.TotalAmount,
 		&order.Items,
+		&order.DeliveryLat,
+		&order.DeliveryLng,
 		&order.CreatedAt,
 	)
 	if err != nil {

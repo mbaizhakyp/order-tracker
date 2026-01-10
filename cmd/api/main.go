@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to setup redis: %v", err)
 	}
-	locationSvc := service.NewLocationService(locationRepo)
+	locationSvc := service.NewLocationService(locationRepo, kafkaPublisher)
 	locationHandler := handler.NewLocationHandler(locationSvc)
 
 	// Dispatch Service Setup
@@ -58,16 +58,40 @@ func main() {
 	wsHub := websocket_internal.NewHub()
 	go wsHub.Run()
 
-	// Start Kafka Consumer (WebSocket Bridge)
-	wsConsumer := event.NewWebSocketConsumer(cfg.Kafka.Brokers, "offers.dispatch", "websocket-group", wsHub)
+	// Start Kafka Consumer (WebSocket Bridge - Offers)
+	wsConsumerOffers := event.NewWebSocketConsumer(cfg.Kafka.Brokers, "offers.dispatch", "websocket-group-offers", wsHub)
 	go func() {
-		if err := wsConsumer.Start(context.Background()); err != nil {
-			log.Printf("Kafka consumer (ws) stopped: %v", err)
+		if err := wsConsumerOffers.Start(context.Background()); err != nil {
+			log.Printf("Kafka consumer (ws-offers) stopped: %v", err)
+		}
+	}()
+
+	// Start Kafka Consumer (WebSocket Bridge - Tracker)
+	wsConsumerTracker := event.NewWebSocketConsumer(cfg.Kafka.Brokers, "tracker", "websocket-group-tracker", wsHub)
+	go func() {
+		if err := wsConsumerTracker.Start(context.Background()); err != nil {
+			log.Printf("Kafka consumer (ws-tracker) stopped: %v", err)
 		}
 	}()
 
 	// 4. Setup Router
 	r := gin.Default()
+
+	// CORS Middleware
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/orders", orderHandler.CreateOrder)
@@ -75,6 +99,9 @@ func main() {
 		v1.POST("/orders/:id/claim", orderHandler.ClaimOrder)
 
 		v1.POST("/location", locationHandler.UpdateLocation)
+
+		demoHandler := handler.NewDemoHandler(storeRepo)
+		v1.POST("/demo/location", demoHandler.SetLocation)
 	}
 
 	r.GET("/ws", func(c *gin.Context) {

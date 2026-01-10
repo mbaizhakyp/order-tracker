@@ -25,4 +25,5 @@ type DispatchRepository interface {
 
 type StoreRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.Store, error)
+	UpdateLocation(ctx context.Context, id string, lat, lng float64) error
 }

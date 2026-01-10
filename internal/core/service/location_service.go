@@ -11,11 +11,15 @@ import (
 )
 
 type LocationService struct {
-	repo ports.LocationRepository
+	repo      ports.LocationRepository
+	publisher ports.EventPublisher
 }
 
-func NewLocationService(repo ports.LocationRepository) *LocationService {
-	return &LocationService{repo: repo}
+func NewLocationService(repo ports.LocationRepository, publisher ports.EventPublisher) *LocationService {
+	return &LocationService{
+		repo:      repo,
+		publisher: publisher,
+	}
 }
 
 type UpdateLocationRequest struct {
@@ -46,7 +50,21 @@ func (s *LocationService) UpdateLocation(ctx context.Context, req UpdateLocation
 		return fmt.Errorf("failed to update location: %w", err)
 	}
 
-	// TODO: Phase 4 - Publish to Kafka for history tracking
+	// Phase 4 - Publish to Kafka for history tracking & real-time updates
+	eventPayload := map[string]interface{}{
+		"type": "SHOPPER_MOVED",
+		"data": map[string]interface{}{
+			"shopper_id": req.ShopperID,
+			"lat":        req.Lat,
+			"lng":        req.Lng,
+			"timestamp":  time.Now(),
+		},
+	}
+
+	if err := s.publisher.Publish(ctx, "tracker", req.ShopperID.String(), eventPayload); err != nil {
+		// Log but don't fail the request (fire and forget)
+		fmt.Printf("Failed to publish location event: %v\n", err)
+	}
 
 	// Print log for demo
 	fmt.Printf("[%s] Shopper %s moved to %.4f, %.4f\n",

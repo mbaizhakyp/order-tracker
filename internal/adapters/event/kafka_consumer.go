@@ -32,8 +32,9 @@ func NewKafkaConsumer(brokers []string, topic string, groupID string, dispatchSv
 }
 
 type EventEnvelope struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
+	Type    string          `json:"type"`
+	Data    json.RawMessage `json:"data"`
+	Payload json.RawMessage `json:"payload,omitempty"` // For rich data (coords, etc.)
 }
 
 type OrderCreatedEvent struct {

@@ -21,10 +21,12 @@ func NewOrderService(repo ports.OrderRepository, publisher ports.EventPublisher)
 }
 
 type CreateOrderRequest struct {
-	CustomerID uuid.UUID          `json:"customer_id"`
-	StoreID    uuid.UUID          `json:"store_id"`
-	TotalCents int64              `json:"total_cents"`
-	Items      []entity.OrderItem `json:"items"`
+	CustomerID  uuid.UUID          `json:"customer_id"`
+	StoreID     uuid.UUID          `json:"store_id"`
+	TotalCents  int64              `json:"total_cents"`
+	Items       []entity.OrderItem `json:"items"`
+	DeliveryLat float64            `json:"delivery_lat"`
+	DeliveryLng float64            `json:"delivery_lng"`
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, req CreateOrderRequest) (*entity.Order, error) {
@@ -41,6 +43,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		StoreID:     req.StoreID,
 		Status:      entity.OrderStatusCreated,
 		TotalAmount: req.TotalCents,
+		DeliveryLat: req.DeliveryLat,
+		DeliveryLng: req.DeliveryLng,
 		CreatedAt:   time.Now(),
 	}
 

@@ -43,6 +43,12 @@ func (s *DispatchService) DispatchOrder(ctx context.Context, orderID uuid.UUID, 
 		return fmt.Errorf("failed to get store: %w", err)
 	}
 
+	// 1b. Get Order Details (for Delivery Location)
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to get order: %w", err)
+	}
+
 	// 2. Find Nearby Shoppers (e.g., 15km radius)
 	radiusKm := 15.0
 	shoppers, err := s.locRepo.GetShoppersWithinRadius(ctx, store.Lat, store.Lng, radiusKm)
@@ -74,6 +80,14 @@ func (s *DispatchService) DispatchOrder(ctx context.Context, orderID uuid.UUID, 
 		eventPayload := map[string]interface{}{
 			"type": "OFFER_CREATED",
 			"data": offer,
+			"payload": map[string]interface{}{
+				"order_id":     offer.OrderID,
+				"shopper_id":   offer.ShopperID,
+				"store_lat":    store.Lat,
+				"store_lng":    store.Lng,
+				"delivery_lat": order.DeliveryLat,
+				"delivery_lng": order.DeliveryLng,
+			},
 		}
 		if err := s.publisher.Publish(ctx, "offers.dispatch", offer.ShopperID.String(), eventPayload); err != nil {
 			log.Printf("WARNING: Failed to publish offer event: %v", err)

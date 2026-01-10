@@ -33,3 +33,13 @@ func (r *PostgresStoreRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	}
 	return store, nil
 }
+
+func (r *PostgresStoreRepository) UpdateLocation(ctx context.Context, id string, lat, lng float64) error {
+	query := `
+		UPDATE stores 
+		SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326)
+		WHERE id = $3
+	`
+	_, err := r.db.Exec(ctx, query, lng, lat, id)
+	return err
+}
