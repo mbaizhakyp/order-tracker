@@ -76,5 +76,63 @@ func (s *OrderService) GetOrder(ctx context.Context, id uuid.UUID) (*entity.Orde
 }
 
 func (s *OrderService) ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error {
-	return s.repo.ClaimOrder(ctx, orderID, shopperID)
+	// 1. Transactional Update in Repo
+	if err := s.repo.ClaimOrder(ctx, orderID, shopperID); err != nil {
+		return err
+	}
+
+	// 2. Fetch updated order for event payload
+	order, err := s.repo.GetByID(ctx, orderID)
+	if err != nil {
+		fmt.Printf("WARNING: Failed to fetch order after claim for event: %v\n", err)
+		return nil // Don't fail the request, but event might be lost
+	}
+
+	// 3. Publish "ORDER_CLAIMED" event
+	eventPayload := map[string]interface{}{
+		"type": "ORDER_CLAIMED",
+		"data": order,
+	}
+	if err := s.publisher.Publish(ctx, "orders.lifecycle", order.ID.String(), eventPayload); err != nil {
+		fmt.Printf("WARNING: Failed to publish event ORDER_CLAIMED: %v\n", err)
+	}
+
+	return nil
+}
+
+func (s *OrderService) ArriveAtStore(ctx context.Context, orderID uuid.UUID) error {
+	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusArrivedAtStore, "ORDER_ARRIVED_AT_STORE")
+}
+
+func (s *OrderService) PickUpOrder(ctx context.Context, orderID uuid.UUID) error {
+	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusPickedUp, "ORDER_PICKED_UP")
+}
+
+func (s *OrderService) ArriveAtCustomer(ctx context.Context, orderID uuid.UUID) error {
+	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusArrivedAtCustomer, "ORDER_ARRIVED_AT_CUSTOMER")
+}
+
+func (s *OrderService) DeliverOrder(ctx context.Context, orderID uuid.UUID) error {
+	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusDelivered, "ORDER_DELIVERED")
+}
+
+func (s *OrderService) updateStatusAndPublish(ctx context.Context, orderID uuid.UUID, status entity.OrderStatus, eventType string) error {
+	if err := s.repo.UpdateSTATUS(ctx, orderID, status); err != nil {
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+
+	// Fetch full order to enrich event
+	order, err := s.repo.GetByID(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch order: %w", err)
+	}
+
+	eventPayload := map[string]interface{}{
+		"type": eventType,
+		"data": order,
+	}
+	if err := s.publisher.Publish(ctx, "orders.lifecycle", order.ID.String(), eventPayload); err != nil {
+		fmt.Printf("WARNING: Failed to publish event %s: %v\n", eventType, err)
+	}
+	return nil
 }

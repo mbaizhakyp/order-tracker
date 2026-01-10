@@ -10,11 +10,13 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusCreated   OrderStatus = "CREATED"
-	OrderStatusOffered   OrderStatus = "OFFERED"
-	OrderStatusClaimed   OrderStatus = "CLAIMED"
-	OrderStatusPickedUp  OrderStatus = "PICKED_UP"
-	OrderStatusDelivered OrderStatus = "DELIVERED"
+	OrderStatusCreated           OrderStatus = "CREATED"
+	OrderStatusOffered           OrderStatus = "OFFERED"
+	OrderStatusClaimed           OrderStatus = "CLAIMED"
+	OrderStatusArrivedAtStore    OrderStatus = "ARRIVED_AT_STORE"
+	OrderStatusPickedUp          OrderStatus = "PICKED_UP"
+	OrderStatusArrivedAtCustomer OrderStatus = "ARRIVED_AT_CUSTOMER"
+	OrderStatusDelivered         OrderStatus = "DELIVERED"
 )
 
 type OrderItem struct {

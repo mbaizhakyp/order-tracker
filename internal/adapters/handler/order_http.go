@@ -74,3 +74,63 @@ func (h *OrderHandler) ClaimOrder(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "CLAIMED"})
 }
+
+func (h *OrderHandler) ArriveAtStore(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	if err := h.svc.ArriveAtStore(c.Request.Context(), orderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ARRIVED_AT_STORE"})
+}
+
+func (h *OrderHandler) PickUpOrder(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	if err := h.svc.PickUpOrder(c.Request.Context(), orderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "PICKED_UP"})
+}
+
+func (h *OrderHandler) ArriveAtCustomer(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	if err := h.svc.ArriveAtCustomer(c.Request.Context(), orderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ARRIVED_AT_CUSTOMER"})
+}
+
+func (h *OrderHandler) DeliverOrder(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	if err := h.svc.DeliverOrder(c.Request.Context(), orderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "DELIVERED"})
+}

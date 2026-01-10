@@ -97,8 +97,23 @@ func (c *WebSocketConsumer) processMessage(ctx context.Context, m kafka.Message)
 			"type":    "SHOPPER_MOVED",
 			"payload": locationData,
 		}
-		// Broadcast to ALL users (simple MVP approach)
-		// Frontend will filter by ShopperID matching their order
+		c.hub.Broadcast(msg)
+	} else {
+		// Generic handling for Order Lifecycle events
+		// (ORDER_CLAIMED, ORDER_ARRIVED_AT_STORE, ORDER_PICKED_UP, ORDER_ARRIVED_AT_CUSTOMER, ORDER_DELIVERED)
+		var orderData map[string]interface{}
+		if err := json.Unmarshal(envelope.Data, &orderData); err != nil {
+			// It might not be an order event, just log warn and ignore
+			log.Printf("Warn: could not unmarshal data for type %s", envelope.Type)
+			return nil
+		}
+
+		msg := map[string]interface{}{
+			"type": envelope.Type,
+			"data": orderData,
+		}
+
+		// Broadcast to all (simplest for MVP to ensure Customer and Courier getting updates)
 		c.hub.Broadcast(msg)
 	}
 

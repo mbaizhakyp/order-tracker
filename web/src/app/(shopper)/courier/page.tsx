@@ -26,21 +26,33 @@ export default function CourierPage() {
     // Listen for Messages
     useEffect(() => {
         if (!lastMessage) return;
+        console.log("WS Message Received:", lastMessage);
 
         if (lastMessage.type === "NEW_OFFER") {
             setCurrentOffer(lastMessage);
         } else if (lastMessage.type === "SHOPPER_MOVED") {
             const payload = lastMessage.payload;
-            // Update my own location if it matches (should always match if I'm the one sending, 
-            // but in this demo, the simulator sends it).
             if (payload.shopper_id === connectedId) {
                 setShopperLocation({ lat: payload.lat, lng: payload.lng });
             }
+        } else if (["ORDER_ARRIVED_AT_STORE", "ORDER_PICKED_UP", "ORDER_ARRIVED_AT_CUSTOMER", "ORDER_DELIVERED"].includes(lastMessage.type)) {
+            // If this update relates to my active order, update state
+            const order = lastMessage.data; // EventEnvelope structure: type, data
+            if (activeOrder && order.id === activeOrder.id) {
+                setActiveOrder((prev: any) => ({ ...prev, status: order.status }));
+            }
         }
-    }, [lastMessage, connectedId]);
+    }, [lastMessage, connectedId, activeOrder]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (!uuidRegex.test(shopperId.trim())) {
+            alert("Please enter a valid UUID (e.g. a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33)");
+            return;
+        }
+
         if (shopperId.trim()) {
             setConnectedId(shopperId);
         }
@@ -51,21 +63,49 @@ export default function CourierPage() {
         const payload = currentOffer.payload;
         const orderId = payload.order_id;
 
-        // API call to claim
-        await api.post(`/orders/${orderId}/claim`, {
-            shopper_id: connectedId,
-        });
+        try {
+            // API call to claim
+            await api.post(`/orders/${orderId}/claim`, {
+                shopper_id: connectedId,
+            });
 
-        // Move to Active Order state
+            // Success path
+            setupActiveOrder(payload);
+
+        } catch (error: any) {
+            // If 409, check if we actually own it (idempotency/recovery)
+            if (error.response?.status === 409) {
+                try {
+                    const res = await api.get(`/orders/${orderId}`);
+                    const order = res.data;
+                    if (order.shopper_id === connectedId) {
+                        // We own it! Recover state.
+                        setupActiveOrder(payload); // payload has location data we need
+                    } else {
+                        alert("This order was already taken by another shopper.");
+                    }
+                } catch (fetchErr) {
+                    console.error("Failed to check order status:", fetchErr);
+                    alert("Failed to claim order.");
+                }
+            } else {
+                console.error("Claim failed:", error);
+                alert("An error occurred while accepting the order.");
+            }
+        }
+
+        setCurrentOffer(null); // Clear offer popup always
+    };
+
+    const setupActiveOrder = (payload: any) => {
         setActiveOrder({
-            id: orderId,
+            id: payload.order_id,
             store_lat: payload.store_lat,
             store_lng: payload.store_lng,
             delivery_lat: payload.delivery_lat,
-            delivery_lng: payload.delivery_lng
+            delivery_lng: payload.delivery_lng,
+            status: "CLAIMED"
         });
-
-        setCurrentOffer(null); // Clear offer popup
     };
 
     const handleDeclineOffer = () => {
@@ -160,25 +200,55 @@ export default function CourierPage() {
                     <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-xl border border-blue-500/20 max-w-md mx-auto">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-bold text-lg">Active Order</h3>
-                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">In Progress</span>
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                                {activeOrder.status?.replace(/_/g, " ") || "IN PROGRESS"}
+                            </span>
                         </div>
-                        <p className="text-sm text-zinc-500 mb-4">You are delivering this order.</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                                <span className="text-zinc-400 block text-xs">Pickup</span>
-                                Target
+                        <p className="text-sm text-zinc-500 mb-4">
+                            {activeOrder.status === "CLAIMED" && "Drive to the store."}
+                            {activeOrder.status === "ARRIVED_AT_STORE" && "You have arrived. Pick up the order."}
+                            {activeOrder.status === "PICKED_UP" && "Drive to the customer."}
+                            {activeOrder.status === "DELIVERED" && "Great job!"}
+                        </p>
+
+                        {(activeOrder.status === "CLAIMED" || activeOrder.status === "ARRIVED_AT_STORE") && (
+                            <button
+                                disabled={activeOrder.status !== "ARRIVED_AT_STORE"}
+                                onClick={async () => {
+                                    await api.post(`/orders/${activeOrder.id}/pickup`);
+                                    setActiveOrder((prev: any) => ({ ...prev, status: "PICKED_UP" }));
+                                }}
+                                className={`mt-4 w-full py-3 text-white rounded-lg font-bold transition shadow-lg ${activeOrder.status === "ARRIVED_AT_STORE"
+                                    ? "bg-blue-600 hover:bg-blue-700"
+                                    : "bg-zinc-300 dark:bg-zinc-700 cursor-not-allowed text-zinc-500"
+                                    }`}
+                            >
+                                {activeOrder.status === "CLAIMED" ? "Driving to Store..." : "PICK UP ORDER"}
+                            </button>
+                        )}
+
+                        {(activeOrder.status === "PICKED_UP" || activeOrder.status === "ARRIVED_AT_CUSTOMER") && (
+                            <button
+                                disabled={activeOrder.status !== "ARRIVED_AT_CUSTOMER"}
+                                onClick={async () => {
+                                    await api.post(`/orders/${activeOrder.id}/deliver`);
+                                    setActiveOrder((prev: any) => ({ ...prev, status: "DELIVERED" }));
+                                    setTimeout(() => setActiveOrder(null), 3000); // Clear after 3s
+                                }}
+                                className={`mt-4 w-full py-3 text-white rounded-lg font-bold transition shadow-lg ${activeOrder.status === "ARRIVED_AT_CUSTOMER"
+                                    ? "bg-green-600 hover:bg-green-700"
+                                    : "bg-zinc-300 dark:bg-zinc-700 cursor-not-allowed text-zinc-500"
+                                    }`}
+                            >
+                                {activeOrder.status === "PICKED_UP" ? "Driving to Customer..." : "MARK AS DELIVERED"}
+                            </button>
+                        )}
+
+                        {activeOrder.status === "DELIVERED" && (
+                            <div className="mt-4 w-full py-3 bg-green-50 text-green-700 text-center rounded-lg font-bold">
+                                Order Completed!
                             </div>
-                            <div className="bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                                <span className="text-zinc-400 block text-xs">Dropoff</span>
-                                Customer
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setActiveOrder(null)}
-                            className="mt-4 w-full py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-sm hover:bg-zinc-300 dark:hover:bg-zinc-700"
-                        >
-                            Complete Order (Demo)
-                        </button>
+                        )}
                     </div>
                 </div>
             )}

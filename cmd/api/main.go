@@ -74,6 +74,15 @@ func main() {
 		}
 	}()
 
+	// Start Kafka Consumer (WebSocket Bridge - Order Lifecycle)
+	// This was missing! Bridging order status events to frontend.
+	wsConsumerLifecycle := event.NewWebSocketConsumer(cfg.Kafka.Brokers, "orders.lifecycle", "websocket-group-lifecycle", wsHub)
+	go func() {
+		if err := wsConsumerLifecycle.Start(context.Background()); err != nil {
+			log.Printf("Kafka consumer (ws-lifecycle) stopped: %v", err)
+		}
+	}()
+
 	// 4. Setup Router
 	r := gin.Default()
 
@@ -97,6 +106,10 @@ func main() {
 		v1.POST("/orders", orderHandler.CreateOrder)
 		v1.GET("/orders/:id", orderHandler.GetOrder)
 		v1.POST("/orders/:id/claim", orderHandler.ClaimOrder)
+		v1.POST("/orders/:id/arrive", orderHandler.ArriveAtStore)
+		v1.POST("/orders/:id/pickup", orderHandler.PickUpOrder)
+		v1.POST("/orders/:id/arrive_customer", orderHandler.ArriveAtCustomer)
+		v1.POST("/orders/:id/deliver", orderHandler.DeliverOrder)
 
 		v1.POST("/location", locationHandler.UpdateLocation)
 

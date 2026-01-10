@@ -59,11 +59,14 @@ export default function OrderTrackingPage() {
 
         if (lastMessage.type === "SHOPPER_MOVED") {
             const payload = lastMessage.payload;
-            // Check if this update is for OUR shopper
-            // Note: We need to access 'order' here. If order is null, we can't verify shopper_id.
-            // But this hook runs even if order is null (it just won't pass the check).
             if (order && order.shopper_id && payload.shopper_id === order.shopper_id) {
                 setShopperLocation({ lat: payload.lat, lng: payload.lng });
+            }
+        } else if (["ORDER_CLAIMED", "ORDER_ARRIVED_AT_STORE", "ORDER_PICKED_UP", "ORDER_ARRIVED_AT_CUSTOMER", "ORDER_DELIVERED"].includes(lastMessage.type)) {
+            // Real-time status update
+            const updatedOrder = lastMessage.data;
+            if (updatedOrder.id === orderId) {
+                setOrder(updatedOrder);
             }
         }
     }, [lastMessage, order]);
@@ -110,7 +113,13 @@ export default function OrderTrackingPage() {
                             <div className="text-xs text-zinc-500">
                                 {order.status === "CREATED" || order.status === "OFFERED"
                                     ? "Hang tight!"
-                                    : "On the way"}
+                                    : order.status === "CLAIMED"
+                                        ? "Shopper is driving to store"
+                                        : order.status === "ARRIVED_AT_STORE"
+                                            ? "Shopper is at the store"
+                                            : order.status === "PICKED_UP"
+                                                ? "On the way to you!"
+                                                : "Delivered"}
                             </div>
                         </div>
                         {/* Status Indicator */}
