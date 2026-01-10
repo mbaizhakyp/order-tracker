@@ -44,19 +44,27 @@ func main() {
 	// Dispatch Service Setup
 	storeRepo := repository.NewPostgresStoreRepository(dbPool)
 	dispatchRepo := repository.NewPostgresDispatchRepository(dbPool)
-	dispatchSvc := service.NewDispatchService(storeRepo, locationRepo, dispatchRepo, orderRepo)
+	dispatchSvc := service.NewDispatchService(storeRepo, locationRepo, dispatchRepo, orderRepo, kafkaPublisher)
 
-	// Start Kafka Consumer
-	consumer := event.NewKafkaConsumer(cfg.Kafka.Brokers, "orders.lifecycle", "dispatch-group", dispatchSvc)
+	// Start Kafka Consumer (Dispatch Logic)
+	dispatchConsumer := event.NewKafkaConsumer(cfg.Kafka.Brokers, "orders.lifecycle", "dispatch-group", dispatchSvc)
 	go func() {
-		if err := consumer.Start(context.Background()); err != nil {
-			log.Printf("Kafka consumer stopped: %v", err)
+		if err := dispatchConsumer.Start(context.Background()); err != nil {
+			log.Printf("Kafka consumer (dispatch) stopped: %v", err)
 		}
 	}()
 
 	// WebSocket Hub
 	wsHub := websocket_internal.NewHub()
 	go wsHub.Run()
+
+	// Start Kafka Consumer (WebSocket Bridge)
+	wsConsumer := event.NewWebSocketConsumer(cfg.Kafka.Brokers, "offers.dispatch", "websocket-group", wsHub)
+	go func() {
+		if err := wsConsumer.Start(context.Background()); err != nil {
+			log.Printf("Kafka consumer (ws) stopped: %v", err)
+		}
+	}()
 
 	// 4. Setup Router
 	r := gin.Default()
@@ -73,14 +81,6 @@ func main() {
 	})
 
 	// 4. Setup Router
-	r := gin.Default()
-	v1 := r.Group("/api/v1")
-	{
-		v1.POST("/orders", orderHandler.CreateOrder)
-		v1.GET("/orders/:id", orderHandler.GetOrder)
-
-		v1.POST("/location", locationHandler.UpdateLocation)
-	}
 
 	// 5. Run Server
 	log.Printf("Starting server on %s", cfg.Server.Port)

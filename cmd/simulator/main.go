@@ -32,10 +32,21 @@ func main() {
 	var shoppers []*Shopper
 
 	// 1. Initialize Shoppers around the center
+	// 1. Initialize Shoppers
+	// Fixed list of IDs to ensure they exist in the DB
+	shopperIDs := []string{
+		"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
+		"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a34",
+		"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a35",
+		"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a36",
+		"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a37",
+	}
+
 	for i := 0; i < ShopperCount; i++ {
+		id := uuid.MustParse(shopperIDs[i])
 		shoppers = append(shoppers, &Shopper{
-			ID:  uuid.New(),
-			Lat: CenterLat + (rand.Float64()*0.02 - 0.01), // +/- 0.01 degrees (~1km)
+			ID:  id,
+			Lat: CenterLat + (rand.Float64()*0.02 - 0.01),
 			Lng: CenterLng + (rand.Float64()*0.02 - 0.01),
 		})
 	}

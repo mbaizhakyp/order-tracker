@@ -107,11 +107,17 @@ func TestDispatchOrder(t *testing.T) {
 			storeRepo := new(MockStoreRepo)
 			locRepo := new(MockLocationRepoDispatch)
 			dispatchRepo := new(MockDispatchRepo)
-			orderRepo := new(MockOrderRepo) // Using the one we defined in order_service_test.go if in same package
+			orderRepo := new(MockOrderRepo)
+			// Reuse MockEventPublisher from order_service_test.go if accessible, or define local
+			// For simplicity/speed in this context, defining local mock or using `mock.Anything` if passed
+
+			// We need a specific mock for Publisher
+			publisher := new(MockEventPublisher) // We need to define this if not in same package or export it
+			publisher.On("Publish", mock.Anything, "offers.dispatch", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			tc.setupMocks(storeRepo, locRepo, dispatchRepo, orderRepo)
 
-			svc := service.NewDispatchService(storeRepo, locRepo, dispatchRepo, orderRepo)
+			svc := service.NewDispatchService(storeRepo, locRepo, dispatchRepo, orderRepo, publisher)
 
 			err := svc.DispatchOrder(context.Background(), orderID, storeID)
 

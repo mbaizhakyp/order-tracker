@@ -16,6 +16,7 @@ type DispatchService struct {
 	locRepo      ports.LocationRepository
 	dispatchRepo ports.DispatchRepository
 	orderRepo    ports.OrderRepository
+	publisher    ports.EventPublisher
 }
 
 func NewDispatchService(
@@ -23,12 +24,14 @@ func NewDispatchService(
 	locRepo ports.LocationRepository,
 	dispatchRepo ports.DispatchRepository,
 	orderRepo ports.OrderRepository,
+	publisher ports.EventPublisher,
 ) *DispatchService {
 	return &DispatchService{
 		storeRepo:    storeRepo,
 		locRepo:      locRepo,
 		dispatchRepo: dispatchRepo,
 		orderRepo:    orderRepo,
+		publisher:    publisher,
 	}
 }
 
@@ -66,6 +69,16 @@ func (s *DispatchService) DispatchOrder(ctx context.Context, orderID uuid.UUID, 
 			log.Printf("Failed to create offer for shopper %s: %v", shopper.ShopperID, err)
 			continue
 		}
+
+		// Publish Event "offers.dispatch"
+		eventPayload := map[string]interface{}{
+			"type": "OFFER_CREATED",
+			"data": offer,
+		}
+		if err := s.publisher.Publish(ctx, "offers.dispatch", offer.ShopperID.String(), eventPayload); err != nil {
+			log.Printf("WARNING: Failed to publish offer event: %v", err)
+		}
+
 		offerCount++
 	}
 
