@@ -134,3 +134,19 @@ func (h *OrderHandler) DeliverOrder(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "DELIVERED"})
 }
+
+func (h *OrderHandler) GetOrderHistory(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	events, err := h.svc.GetOrderHistory(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, events)
+}

@@ -12,6 +12,7 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.Order, error)
 	UpdateSTATUS(ctx context.Context, id uuid.UUID, status entity.OrderStatus) error
 	ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error
+	GetOrderHistory(ctx context.Context, orderID uuid.UUID) ([]entity.OrderEvent, error)
 }
 
 type LocationRepository interface {

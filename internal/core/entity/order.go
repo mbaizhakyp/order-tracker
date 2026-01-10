@@ -19,6 +19,14 @@ const (
 	OrderStatusDelivered         OrderStatus = "DELIVERED"
 )
 
+type OrderEvent struct {
+	ID        uuid.UUID       `json:"id"`
+	OrderID   uuid.UUID       `json:"order_id"`
+	Status    string          `json:"status"`
+	Metadata  json.RawMessage `json:"metadata"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
 type OrderItem struct {
 	Name     string `json:"name"`
 	Quantity int    `json:"qty"`

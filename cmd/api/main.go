@@ -110,6 +110,7 @@ func main() {
 		v1.POST("/orders/:id/pickup", orderHandler.PickUpOrder)
 		v1.POST("/orders/:id/arrive_customer", orderHandler.ArriveAtCustomer)
 		v1.POST("/orders/:id/deliver", orderHandler.DeliverOrder)
+		v1.GET("/orders/:id/history", orderHandler.GetOrderHistory)
 
 		v1.POST("/location", locationHandler.UpdateLocation)
 

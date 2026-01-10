@@ -82,9 +82,25 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 }
 
 func (r *PostgresOrderRepository) UpdateSTATUS(ctx context.Context, id uuid.UUID, status entity.OrderStatus) error {
-	query := `UPDATE orders SET status = $1 WHERE id = $2`
-	_, err := r.db.Exec(ctx, query, status, id)
-	return err
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Update Order
+	queryUpdate := `UPDATE orders SET status = $1 WHERE id = $2`
+	if _, err := tx.Exec(ctx, queryUpdate, status, id); err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+
+	// 2. Insert Event
+	queryEvent := `INSERT INTO order_events (order_id, status) VALUES ($1, $2)`
+	if _, err := tx.Exec(ctx, queryEvent, id, status); err != nil {
+		return fmt.Errorf("failed to insert event: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *PostgresOrderRepository) ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error {
@@ -112,5 +128,35 @@ func (r *PostgresOrderRepository) ClaimOrder(ctx context.Context, orderID uuid.U
 		return fmt.Errorf("failed to update order: %w", err)
 	}
 
+	// 4. Insert Event
+	queryEvent := `INSERT INTO order_events (order_id, status) VALUES ($1, $2)`
+	if _, err := tx.Exec(ctx, queryEvent, orderID, entity.OrderStatusClaimed); err != nil {
+		return fmt.Errorf("failed to insert event: %w", err)
+	}
+
 	return tx.Commit(ctx)
+}
+
+func (r *PostgresOrderRepository) GetOrderHistory(ctx context.Context, orderID uuid.UUID) ([]entity.OrderEvent, error) {
+	query := `
+		SELECT id, order_id, status, metadata, created_at
+		FROM order_events
+		WHERE order_id = $1
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.Query(ctx, query, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []entity.OrderEvent
+	for rows.Next() {
+		var e entity.OrderEvent
+		if err := rows.Scan(&e.ID, &e.OrderID, &e.Status, &e.Metadata, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, nil
 }

@@ -38,11 +38,15 @@ export default function CourierPage() {
         } else if (["ORDER_ARRIVED_AT_STORE", "ORDER_PICKED_UP", "ORDER_ARRIVED_AT_CUSTOMER", "ORDER_DELIVERED"].includes(lastMessage.type)) {
             // If this update relates to my active order, update state
             const order = lastMessage.data; // EventEnvelope structure: type, data
-            if (activeOrder && order.id === activeOrder.id) {
-                setActiveOrder((prev: any) => ({ ...prev, status: order.status }));
-            }
+
+            setActiveOrder((prev: any) => {
+                if (prev && order.id === prev.id) {
+                    return { ...prev, status: order.status };
+                }
+                return prev;
+            });
         }
-    }, [lastMessage, connectedId, activeOrder]);
+    }, [lastMessage, connectedId]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();

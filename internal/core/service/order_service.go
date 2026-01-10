@@ -136,3 +136,7 @@ func (s *OrderService) updateStatusAndPublish(ctx context.Context, orderID uuid.
 	}
 	return nil
 }
+
+func (s *OrderService) GetOrderHistory(ctx context.Context, orderID uuid.UUID) ([]entity.OrderEvent, error) {
+	return s.repo.GetOrderHistory(ctx, orderID)
+}
