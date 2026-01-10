@@ -48,3 +48,29 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 
 	c.JSON(http.StatusOK, order)
 }
+
+type ClaimOrderRequest struct {
+	ShopperID uuid.UUID `json:"shopper_id" binding:"required"`
+}
+
+func (h *OrderHandler) ClaimOrder(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	var req ClaimOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.svc.ClaimOrder(c.Request.Context(), orderID, req.ShopperID); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()}) // 409 Conflict is appropriate for race condition failure
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "CLAIMED"})
+}

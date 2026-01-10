@@ -72,6 +72,7 @@ func main() {
 	{
 		v1.POST("/orders", orderHandler.CreateOrder)
 		v1.GET("/orders/:id", orderHandler.GetOrder)
+		v1.POST("/orders/:id/claim", orderHandler.ClaimOrder)
 
 		v1.POST("/location", locationHandler.UpdateLocation)
 	}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,4 +81,32 @@ func (r *PostgresOrderRepository) UpdateSTATUS(ctx context.Context, id uuid.UUID
 	query := `UPDATE orders SET status = $1 WHERE id = $2`
 	_, err := r.db.Exec(ctx, query, status, id)
 	return err
+}
+
+func (r *PostgresOrderRepository) ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Lock the row
+	var currentStatus string
+	queryLock := `SELECT status FROM orders WHERE id = $1 FOR UPDATE`
+	if err := tx.QueryRow(ctx, queryLock, orderID).Scan(&currentStatus); err != nil {
+		return fmt.Errorf("failed to lock order: %w", err)
+	}
+
+	// 2. Do logic check
+	if currentStatus != string(entity.OrderStatusOffered) {
+		return fmt.Errorf("order cannot be claimed (status: %s)", currentStatus)
+	}
+
+	// 3. Update status and shopper_id
+	queryUpdate := `UPDATE orders SET status = $1, shopper_id = $2 WHERE id = $3`
+	if _, err := tx.Exec(ctx, queryUpdate, entity.OrderStatusClaimed, shopperID, orderID); err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }

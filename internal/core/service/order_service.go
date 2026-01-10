@@ -70,3 +70,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 func (s *OrderService) GetOrder(ctx context.Context, id uuid.UUID) (*entity.Order, error) {
 	return s.repo.GetByID(ctx, id)
 }
+
+func (s *OrderService) ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error {
+	return s.repo.ClaimOrder(ctx, orderID, shopperID)
+}

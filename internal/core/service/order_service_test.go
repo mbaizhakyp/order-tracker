@@ -36,6 +36,11 @@ func (m *MockOrderRepo) UpdateSTATUS(ctx context.Context, id uuid.UUID, status e
 	return args.Error(0)
 }
 
+func (m *MockOrderRepo) ClaimOrder(ctx context.Context, orderID uuid.UUID, shopperID uuid.UUID) error {
+	args := m.Called(ctx, orderID, shopperID)
+	return args.Error(0)
+}
+
 type MockEventPublisher struct {
 	mock.Mock
 }
