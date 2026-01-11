@@ -34,6 +34,28 @@ func (r *PostgresStoreRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	return store, nil
 }
 
+func (r *PostgresStoreRepository) GetAll(ctx context.Context) ([]entity.Store, error) {
+	query := `
+		SELECT id, name, ST_X(location::geometry), ST_Y(location::geometry)
+		FROM stores
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list stores: %w", err)
+	}
+	defer rows.Close()
+
+	var stores []entity.Store
+	for rows.Next() {
+		var s entity.Store
+		if err := rows.Scan(&s.ID, &s.Name, &s.Lng, &s.Lat); err != nil {
+			return nil, err
+		}
+		stores = append(stores, s)
+	}
+	return stores, nil
+}
+
 func (r *PostgresStoreRepository) UpdateLocation(ctx context.Context, id string, lat, lng float64) error {
 	query := `
 		UPDATE stores 

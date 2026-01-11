@@ -23,10 +23,10 @@ import (
 const (
 	ServerURL      = "http://localhost:8080/api/v1"
 	ShopperCount   = 5
-	UpdateInterval = 500 * time.Millisecond
+	UpdateInterval = 200 * time.Millisecond
 	CenterLat      = 33.2098 // Tuscaloosa
 	CenterLng      = -87.5692
-	MovementSpeed  = 0.0010 // Increased speed for demo (approx 100m/s visually)
+	MovementSpeed  = 0.0004 // Restore original velocity (approx 800km/h demo speed) for 5Hz updates
 	ArrivalRadius  = 0.0010 // Approx 100m
 )
 
@@ -283,8 +283,19 @@ func updateShoppers() {
 
 			switch shopper.Mode {
 			case ModeIdle:
-				// Random Walk
-				moveTowards(shopper, shopper.Lat+(rand.Float64()-0.5)*0.01, shopper.Lng+(rand.Float64()-0.5)*0.01, 0.0001)
+				// 1. Check if we have a target or if we arrived at the current random target
+				dist := distance(shopper.Lat, shopper.Lng, shopper.TargetLat, shopper.TargetLng)
+
+				// Initialize target if it's 0 (start) or if we arrived (within radius)
+				if (shopper.TargetLat == 0 && shopper.TargetLng == 0) || dist < ArrivalRadius {
+					// Pick a new random waypoint within approx 3km (0.03 degrees)
+					shopper.TargetLat = CenterLat + (rand.Float64()-0.5)*0.06
+					shopper.TargetLng = CenterLng + (rand.Float64()-0.5)*0.06
+					log.Printf("Shopper %s cruising to new waypoint.", shopper.ID)
+				}
+
+				// 2. Cruise towards the random waypoint
+				moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, MovementSpeed)
 
 			case ModeDrivingToStore:
 				dist := distance(shopper.Lat, shopper.Lng, shopper.TargetLat, shopper.TargetLng)
@@ -299,7 +310,7 @@ func updateShoppers() {
 			case ModeDrivingToCustomer:
 				dist := distance(shopper.Lat, shopper.Lng, shopper.TargetLat, shopper.TargetLng)
 				if dist < ArrivalRadius {
-					log.Printf("Shopper %s arrived at customer.", shopper.ID)
+					log.Printf("Shopper %s arrived at customer. Waiting for manual delivery confirmation.", shopper.ID)
 					shopper.Mode = ModeAtCustomer
 					go postAction(shopper.ActiveOrderID, "arrive_customer")
 				} else {

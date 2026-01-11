@@ -113,8 +113,7 @@ func (s *OrderService) ArriveAtCustomer(ctx context.Context, orderID uuid.UUID) 
 }
 
 func (s *OrderService) DeliverOrder(ctx context.Context, orderID uuid.UUID) error {
-	// Add logic: Verify shopper is at customer location?
-	return s.repo.UpdateSTATUS(ctx, orderID, entity.OrderStatusDelivered)
+	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusDelivered, "ORDER_DELIVERED")
 }
 
 func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID) error {

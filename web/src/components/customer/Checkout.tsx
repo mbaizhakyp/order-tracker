@@ -8,13 +8,14 @@ interface CheckoutProps {
     cart: { [key: string]: number };
     totalAmountCents: number;
     onSuccess: (orderId: string) => void;
+    onSuccess: (orderId: string) => void;
     location: { lat: number; lng: number } | null;
+    storeId: string;
 }
 
-export default function Checkout({ cart, totalAmountCents, onSuccess, location }: CheckoutProps) {
+export default function Checkout({ cart, totalAmountCents, onSuccess, location, storeId }: CheckoutProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [customerId, setCustomerId] = useState("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"); // Default ID for demo
-    const [storeId, setStoreId] = useState("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"); // Default Store
 
     const handleCheckout = async () => {
         setIsLoading(true);
