@@ -34,6 +34,9 @@ func main() {
 	orderSvc := service.NewOrderService(orderRepo, kafkaPublisher)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 
+	// Start Auto-Cancellation Background Job
+	go orderSvc.AutoCancelLoop(context.Background())
+
 	locationRepo, err := repository.NewRedisLocationRepository(cfg.Redis.Addr)
 	if err != nil {
 		log.Fatalf("failed to setup redis: %v", err)
@@ -45,6 +48,15 @@ func main() {
 	storeRepo := repository.NewPostgresStoreRepository(dbPool)
 	dispatchRepo := repository.NewPostgresDispatchRepository(dbPool)
 	dispatchSvc := service.NewDispatchService(storeRepo, locationRepo, dispatchRepo, orderRepo, kafkaPublisher)
+
+	// Auth Service Setup
+	userRepo := repository.NewPostgresUserRepository(dbPool)
+	authSvc := service.NewAuthService(userRepo, kafkaPublisher, cfg.Auth.JWTSecret)
+	authHandler := handler.NewAuthHandler(authSvc)
+
+	// Store Service Setup
+	storeSvc := service.NewStoreService(storeRepo)
+	storeHandler := handler.NewStoreHandler(storeSvc)
 
 	// Start Kafka Consumer (Dispatch Logic)
 	dispatchConsumer := event.NewKafkaConsumer(cfg.Kafka.Brokers, "orders.lifecycle", "dispatch-group", dispatchSvc)
@@ -88,7 +100,7 @@ func main() {
 
 	// CORS Middleware
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
@@ -103,19 +115,36 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	{
-		v1.POST("/orders", orderHandler.CreateOrder)
-		v1.GET("/orders/:id", orderHandler.GetOrder)
-		v1.POST("/orders/:id/claim", orderHandler.ClaimOrder)
-		v1.POST("/orders/:id/arrive", orderHandler.ArriveAtStore)
-		v1.POST("/orders/:id/pickup", orderHandler.PickUpOrder)
-		v1.POST("/orders/:id/arrive_customer", orderHandler.ArriveAtCustomer)
-		v1.POST("/orders/:id/deliver", orderHandler.DeliverOrder)
-		v1.GET("/orders/:id/history", orderHandler.GetOrderHistory)
+		// Auth
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+		}
+
+		// Protected Routes (TODO: Apply Middleware using authSvc.JWTSecret)
+		// For now public to keep Simulator working until updated
+		orderGroup := v1.Group("/orders")
+		{
+			orderGroup.POST("", orderHandler.CreateOrder)
+			orderGroup.GET("/:id", orderHandler.GetOrder)
+			orderGroup.POST("/:id/claim", orderHandler.ClaimOrder)
+			orderGroup.POST("/:id/arrive", orderHandler.ArriveAtStore)
+			orderGroup.POST("/:id/pickup", orderHandler.PickUpOrder)
+			orderGroup.POST("/:id/arrive_customer", orderHandler.ArriveAtCustomer)
+			orderGroup.POST("/:id/deliver", orderHandler.DeliverOrder)
+			orderGroup.POST("/:id/cancel", orderHandler.CancelOrder)
+			orderGroup.GET("/:id/history", orderHandler.GetOrderHistory)
+		}
+		// List all orders for the logged in user
+		v1.GET("/orders", orderHandler.GetUserOrders)
 
 		v1.POST("/location", locationHandler.UpdateLocation)
 
 		demoHandler := handler.NewDemoHandler(storeRepo)
 		v1.POST("/demo/location", demoHandler.SetLocation)
+
+		v1.GET("/stores", storeHandler.GetStores)
 	}
 
 	r.GET("/ws", func(c *gin.Context) {

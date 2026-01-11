@@ -169,16 +169,59 @@ func handleMessage(m kafka.Message) {
 	}
 	shoppersMu.Unlock()
 
-	if shopper == nil {
-		return
-	}
-
-	shopper.mu.Lock()
-	defer shopper.mu.Unlock()
-
 	switch event.Type {
+	case "SHOPPER_ONLINE":
+		log.Printf("Shopper %s came online! Spawning ghost car.", shopperID)
+
+		shoppersMu.Lock()
+		// Check if already exists
+		exists := false
+		for _, s := range shoppers {
+			if s.ID == shopperID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			newShopper := &Shopper{
+				ID:   shopperID,
+				Lat:  CenterLat + (rand.Float64()-0.5)*0.01,
+				Lng:  CenterLng + (rand.Float64()-0.5)*0.01,
+				Mode: ModeIdle, // Start random walking
+			}
+			shoppers = append(shoppers, newShopper)
+		}
+		shoppersMu.Unlock()
+
 	case "ORDER_CLAIMED":
-		log.Printf("Shopper %s claimed order %s. Driving to Store.", shopper.ID, orderID)
+		log.Printf("Shopper %s claimed order %s. Driving to Store.", shopperID, orderID)
+
+		// Dynamic Recruitment if not found (e.g. simulator restarted, or joined before online event handled)
+		if shopper == nil {
+			log.Printf("Shopper %s not found in sim. recruiting now...", shopperID)
+			shopper = &Shopper{
+				ID:   shopperID,
+				Lat:  CenterLat + (rand.Float64()-0.5)*0.01, // Spawn near center
+				Lng:  CenterLng + (rand.Float64()-0.5)*0.01,
+				Mode: ModeIdle,
+				mu:   sync.Mutex{},
+			}
+			shoppersMu.Lock()
+			shoppers = append(shoppers, shopper)
+			shoppersMu.Unlock()
+		} else {
+			// If shopper WAS found found, we need to relock it to modify it safely
+			// The original code had a bug here where `shopper.mu.Lock()` was called unconditionally
+			// even if shopper was nil (though nil check was added later).
+			// But now `shopper` might be the new one or the old one. Be careful.
+		}
+
+		// Re-fetch shopper from list or use the new one, but to be thread safe with the main loop
+		// which locks shopper.mu, we need to be careful.
+		// The `shopper` variable is a pointer.
+
+		shopper.mu.Lock()
+		defer shopper.mu.Unlock()
 
 		storeIDStr, ok := data["store_id"].(string)
 		if !ok {
@@ -197,6 +240,14 @@ func handleMessage(m kafka.Message) {
 		}
 
 	case "ORDER_PICKED_UP":
+		// Ensure shopper exists (edge case)
+		if shopper == nil {
+			return
+		}
+
+		shopper.mu.Lock()
+		defer shopper.mu.Unlock()
+
 		log.Printf("Shopper %s picked up order. Driving to Customer.", shopper.ID)
 		shopper.Mode = ModeDrivingToCustomer
 		lat, _ := data["delivery_lat"].(float64)
@@ -205,6 +256,13 @@ func handleMessage(m kafka.Message) {
 		shopper.TargetLng = lng
 
 	case "ORDER_DELIVERED":
+		if shopper == nil {
+			return
+		}
+
+		shopper.mu.Lock()
+		defer shopper.mu.Unlock()
+
 		log.Printf("Shopper %s delivered order. Returning to Idle.", shopper.ID)
 		shopper.Mode = ModeIdle
 		shopper.ActiveOrderID = uuid.Nil

@@ -6,15 +6,29 @@ import OfferCard from "@/components/shopper/OfferCard";
 import { api } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 import LiveMap from "@/components/maps/LiveMap";
-
-
+import { useAuth } from "@/context/AuthContext";
+import { LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function CourierPage() {
-    const [shopperId, setShopperId] = useState("");
+    const { user, logout } = useAuth();
+    const router = useRouter();
     const [connectedId, setConnectedId] = useState<string | null>(null);
     const [currentOffer, setCurrentOffer] = useState<any>(null);
     const [activeOrder, setActiveOrder] = useState<any>(null);
     const [shopperLocation, setShopperLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
+
+    // Auto-connect if logged in user is a SHOPPER
+    useEffect(() => {
+        if (!user) {
+            router.push("/login");
+            return;
+        }
+
+        if (user.role === "SHOPPER" && !connectedId) {
+            setConnectedId(user.id);
+        }
+    }, [user, connectedId, router]);
 
     // Connect to WS only when we have a valid connectedId
     const wsUrl = connectedId
@@ -47,20 +61,6 @@ export default function CourierPage() {
             });
         }
     }, [lastMessage, connectedId]);
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-        if (!uuidRegex.test(shopperId.trim())) {
-            alert("Please enter a valid UUID (e.g. a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33)");
-            return;
-        }
-
-        if (shopperId.trim()) {
-            setConnectedId(shopperId);
-        }
-    };
 
     const handleAcceptOffer = async () => {
         if (!currentOffer) return;
@@ -116,36 +116,13 @@ export default function CourierPage() {
         setCurrentOffer(null);
     };
 
+    // Render loading state while connecting
     if (!connectedId) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black p-4">
-                <div className="w-full max-w-md bg-white dark:bg-zinc-900 p-8 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-800">
-                    <h1 className="text-2xl font-bold mb-6 text-center">Shopper Login</h1>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label htmlFor="shopperId" className="block text-sm font-medium mb-1">
-                                Enter Shopper UUID
-                            </label>
-                            <input
-                                id="shopperId"
-                                type="text"
-                                value={shopperId}
-                                onChange={(e) => setShopperId(e.target.value)}
-                                placeholder="e.g. a0eebc99-..."
-                                className="w-full px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
-                                required
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
-                        >
-                            Start Shift
-                        </button>
-                    </form>
-                    <div className="mt-6 text-xs text-zinc-500 text-center">
-                        <p>Test ID: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33</p>
-                    </div>
+            <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                    <p className="text-zinc-500">Connecting to dispatch...</p>
                 </div>
             </div>
         );
@@ -156,9 +133,19 @@ export default function CourierPage() {
             {/* Header */}
             <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex justify-between items-center shadow-sm z-10 relative">
                 <h1 className="font-bold text-lg">OrderTracker Courier</h1>
-                <div className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
-                    <span>{isConnected ? "Online" : "Connecting..."}</span>
+                <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
+                        <span>{isConnected ? "Online" : "Connecting..."}</span>
+                    </div>
+                    {user && (
+                        <div className="flex items-center gap-4 border-l pl-4 border-zinc-200 dark:border-zinc-700">
+                            <span className="font-medium text-zinc-600 dark:text-zinc-400">Hello, {user.name}</span>
+                            <button onClick={() => { logout(); router.push("/login"); }} className="text-red-500 hover:text-red-600" title="Log Out">
+                                <LogOut className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
