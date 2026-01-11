@@ -17,6 +17,7 @@ const (
 	OrderStatusPickedUp          OrderStatus = "PICKED_UP"
 	OrderStatusArrivedAtCustomer OrderStatus = "ARRIVED_AT_CUSTOMER"
 	OrderStatusDelivered         OrderStatus = "DELIVERED"
+	OrderStatusCancelled         OrderStatus = "CANCELLED"
 )
 
 type OrderEvent struct {
@@ -44,6 +45,8 @@ type Order struct {
 	DeliveryLat float64         `json:"delivery_lat"`
 	DeliveryLng float64         `json:"delivery_lng"`
 	CreatedAt   time.Time       `json:"created_at"`
+	StoreName   string          `json:"store_name,omitempty"`   // Populated in list views
+	ShopperName string          `json:"shopper_name,omitempty"` // Populated in details views
 }
 
 // Helper to parse items

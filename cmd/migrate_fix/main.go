@@ -26,9 +26,8 @@ func main() {
 
 	// 3. Execute Migration
 	query := `
-		ALTER TABLE orders 
-		ADD COLUMN IF NOT EXISTS delivery_lat FLOAT DEFAULT 0,
-		ADD COLUMN IF NOT EXISTS delivery_lng FLOAT DEFAULT 0;
+		ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+		ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('CREATED', 'OFFERED', 'CLAIMED', 'ARRIVED_AT_STORE', 'PICKED_UP', 'ARRIVED_AT_CUSTOMER', 'DELIVERED', 'CANCELLED'));
 	`
 
 	_, err = dbPool.Exec(context.Background(), query)
@@ -36,5 +35,5 @@ func main() {
 		log.Fatalf("Migration failed: %v", err)
 	}
 
-	log.Println("Successfully added delivery_lat and delivery_lng columns to orders table.")
+	log.Println("Successfully updated orders_status_check constraint.")
 }

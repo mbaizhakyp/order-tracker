@@ -113,7 +113,45 @@ func (s *OrderService) ArriveAtCustomer(ctx context.Context, orderID uuid.UUID) 
 }
 
 func (s *OrderService) DeliverOrder(ctx context.Context, orderID uuid.UUID) error {
-	return s.updateStatusAndPublish(ctx, orderID, entity.OrderStatusDelivered, "ORDER_DELIVERED")
+	// Add logic: Verify shopper is at customer location?
+	return s.repo.UpdateSTATUS(ctx, orderID, entity.OrderStatusDelivered)
+}
+
+func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID) error {
+	// Add logic: Verify order is not already delivered?
+	return s.repo.CancelOrder(ctx, orderID)
+}
+
+func (s *OrderService) GetUserOrders(ctx context.Context, userID uuid.UUID) ([]entity.Order, error) {
+	return s.repo.GetByCustomerID(ctx, userID)
+}
+
+func (s *OrderService) AutoCancelLoop(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	// Initial run immediately
+	s.cancelStaleOrders(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.cancelStaleOrders(ctx)
+		}
+	}
+}
+
+func (s *OrderService) cancelStaleOrders(ctx context.Context) {
+	// Cancel orders older than 5 minutes
+	threshold := time.Now().Add(-5 * time.Minute)
+	count, err := s.repo.CancelStaleOrders(ctx, threshold)
+	if err != nil {
+		fmt.Printf("Error cancelling stale orders: %v\n", err)
+	} else if count > 0 {
+		fmt.Printf("Auto-cancelled %d stale orders\n", count)
+	}
 }
 
 func (s *OrderService) updateStatusAndPublish(ctx context.Context, orderID uuid.UUID, status entity.OrderStatus, eventType string) error {

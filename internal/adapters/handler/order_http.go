@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -149,4 +150,52 @@ func (h *OrderHandler) GetOrderHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, events)
+}
+
+func (h *OrderHandler) CancelOrder(c *gin.Context) {
+	idParam := c.Param("id")
+	orderID, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order id"})
+		return
+	}
+
+	if err := h.svc.CancelOrder(c.Request.Context(), orderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "CANCELLED"})
+}
+
+func (h *OrderHandler) GetUserOrders(c *gin.Context) {
+	var userID uuid.UUID
+	var err error
+
+	// 1. Try to get from Auth Middleware
+	userIDVal, exists := c.Get("userID")
+	if exists {
+		if idStr, ok := userIDVal.(string); ok {
+			userID, err = uuid.Parse(idStr)
+		} else if idUUID, ok := userIDVal.(uuid.UUID); ok {
+			userID = idUUID
+		} else {
+			err = fmt.Errorf("invalid user id type in context")
+		}
+	} else {
+		// 2. Fallback to Demo ID if not authenticated (should be behind middleware ideally)
+		// For consistent demo experience if user hits this without token (though frontend sends it)
+		userID, _ = uuid.Parse("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+	}
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	orders, err := h.svc.GetUserOrders(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, orders)
 }
