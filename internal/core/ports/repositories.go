@@ -16,6 +16,7 @@ type OrderRepository interface {
 	CancelOrder(ctx context.Context, orderID uuid.UUID) error
 	GetOrderHistory(ctx context.Context, orderID uuid.UUID) ([]entity.OrderEvent, error)
 	GetByCustomerID(ctx context.Context, customerID uuid.UUID) ([]entity.Order, error)
+	GetActiveByShopperID(ctx context.Context, shopperID uuid.UUID) (*entity.Order, error)
 	CancelStaleOrders(ctx context.Context, olderThan time.Time) (int64, error)
 }
 

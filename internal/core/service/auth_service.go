@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/mbaizhakyp/order-tracker/internal/core/entity"
 	"github.com/mbaizhakyp/order-tracker/internal/core/ports"
 	"golang.org/x/crypto/bcrypt"
@@ -102,4 +103,30 @@ func (s *AuthService) generateToken(user *entity.User) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtSecret))
+}
+
+func (s *AuthService) AnnounceShopperOnline(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	if user.Role != "SHOPPER" {
+		return nil // Only shoppers need to announce presence for simulation
+	}
+
+	eventPayload := map[string]interface{}{
+		"type": "SHOPPER_ONLINE",
+		"data": map[string]interface{}{
+			"shopper_id": user.ID.String(),
+			"name":       user.Name,
+		},
+	}
+	if err := s.publisher.Publish(ctx, "orders.lifecycle", user.ID.String(), eventPayload); err != nil {
+		return fmt.Errorf("failed to publish presence: %w", err)
+	}
+	return nil
 }

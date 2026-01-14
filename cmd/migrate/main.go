@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -35,6 +37,19 @@ func main() {
 		"postgres", driver)
 	if err != nil {
 		log.Fatalf("failed to create migrate instance: %v", err)
+	}
+
+	// CLI Argument Parsing
+	if len(os.Args) > 2 && os.Args[1] == "force" {
+		version, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			log.Fatalf("invalid version: %v", err)
+		}
+		if err := m.Force(version); err != nil {
+			log.Fatalf("force failed: %v", err)
+		}
+		log.Printf("Forced version to %d", version)
+		return
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mbaizhakyp/order-tracker/internal/core/entity"
 	"github.com/mbaizhakyp/order-tracker/internal/core/ports"
@@ -216,4 +217,38 @@ func (r *PostgresOrderRepository) CancelStaleOrders(ctx context.Context, olderTh
 		return 0, err
 	}
 	return tag.RowsAffected(), nil
+}
+
+func (r *PostgresOrderRepository) GetActiveByShopperID(ctx context.Context, shopperID uuid.UUID) (*entity.Order, error) {
+	// Let's implement a simple version first that returns the Order, and I'll modify the Service to fetch Store details if missing.
+
+	simpleQuery := `
+		SELECT o.id, o.customer_id, o.store_id, o.shopper_id, o.status, o.total_amount, o.items, o.delivery_lat, o.delivery_lng, o.created_at
+		FROM orders o
+		WHERE o.shopper_id = $1
+		AND o.status IN ('CLAIMED', 'ARRIVED_AT_STORE', 'PICKED_UP', 'ARRIVED_AT_CUSTOMER')
+		LIMIT 1
+	`
+	var o entity.Order
+	err := r.db.QueryRow(ctx, simpleQuery, shopperID).Scan(
+		&o.ID,
+		&o.CustomerID,
+		&o.StoreID,
+		&o.ShopperID,
+		&o.Status,
+		&o.TotalAmount,
+		&o.Items,
+		&o.DeliveryLat,
+		&o.DeliveryLng,
+		&o.CreatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows { // using pgx error
+			return nil, nil // No active order
+		}
+		// We need to import pgx for ErrNoRows check if not already imported or available via errors.Is
+		// The file imports github.com/jackc/pgx/v5
+		return nil, fmt.Errorf("failed to get active order: %w", err)
+	}
+	return &o, nil
 }

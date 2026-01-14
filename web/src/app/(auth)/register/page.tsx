@@ -60,7 +60,7 @@ export default function RegisterPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Full Name</label>
+                        <label className="block text-sm font-medium mb-1">First Name</label>
                         <input
                             name="name"
                             value={form.name}
@@ -100,8 +100,8 @@ export default function RegisterPage() {
                                 type="button"
                                 onClick={() => setForm({ ...form, role: "CUSTOMER" })}
                                 className={`py-2 rounded-lg border font-medium transition ${form.role === "CUSTOMER"
-                                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600"
-                                        : "border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600"
+                                    : "border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                                     }`}
                             >
                                 Customer
@@ -110,8 +110,8 @@ export default function RegisterPage() {
                                 type="button"
                                 onClick={() => setForm({ ...form, role: "SHOPPER" })}
                                 className={`py-2 rounded-lg border font-medium transition ${form.role === "SHOPPER"
-                                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600"
-                                        : "border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600"
+                                    : "border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                                     }`}
                             >
                                 Shopper

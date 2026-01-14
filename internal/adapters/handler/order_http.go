@@ -24,6 +24,29 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	// Extract UserID from context (set by Middleware)
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// Handle both string and UUID types for safety (middleware usually sets string from standard claims)
+	if idStr, ok := userIDVal.(string); ok {
+		if uid, err := uuid.Parse(idStr); err == nil {
+			req.CustomerID = uid
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id in token"})
+			return
+		}
+	} else if idUUID, ok := userIDVal.(uuid.UUID); ok {
+		req.CustomerID = idUUID
+	} else {
+		// Try float64 (JWT numeric claim edge case) or map
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user id type"})
+		return
+	}
+
 	order, err := h.svc.CreateOrder(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -198,4 +221,29 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, orders)
+}
+
+func (h *OrderHandler) GetShopperActiveOrder(c *gin.Context) {
+	userIDStr, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	shopperID, err := uuid.Parse(userIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	orderData, err := h.svc.GetShopperActiveOrder(c.Request.Context(), shopperID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if orderData == nil {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+
+	c.JSON(http.StatusOK, orderData)
 }

@@ -1,0 +1,1 @@
+-- No-op: We cannot easily revert random name assignments without a backup.

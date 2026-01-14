@@ -13,11 +13,12 @@ import (
 
 type OrderService struct {
 	repo      ports.OrderRepository
+	storeRepo ports.StoreRepository
 	publisher ports.EventPublisher
 }
 
-func NewOrderService(repo ports.OrderRepository, publisher ports.EventPublisher) *OrderService {
-	return &OrderService{repo: repo, publisher: publisher}
+func NewOrderService(repo ports.OrderRepository, storeRepo ports.StoreRepository, publisher ports.EventPublisher) *OrderService {
+	return &OrderService{repo: repo, storeRepo: storeRepo, publisher: publisher}
 }
 
 type CreateOrderRequest struct {
@@ -176,4 +177,34 @@ func (s *OrderService) updateStatusAndPublish(ctx context.Context, orderID uuid.
 
 func (s *OrderService) GetOrderHistory(ctx context.Context, orderID uuid.UUID) ([]entity.OrderEvent, error) {
 	return s.repo.GetOrderHistory(ctx, orderID)
+}
+
+func (s *OrderService) GetShopperActiveOrder(ctx context.Context, shopperID uuid.UUID) (map[string]interface{}, error) {
+	// 1. Get the active order for this shopper
+	order, err := s.repo.GetActiveByShopperID(ctx, shopperID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active order: %w", err)
+	}
+	if order == nil {
+		return nil, nil
+	}
+
+	// 2. Fetch store to get location
+	store, err := s.storeRepo.GetByID(ctx, order.StoreID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get store for active order: %w", err)
+	}
+
+	// 3. Construct response map (matching Dispatch Offer payload structure for consistency in frontend)
+	return map[string]interface{}{
+		"id":           order.ID,
+		"status":       order.Status,
+		"store_id":     store.ID,
+		"store_lat":    store.Lat,
+		"store_lng":    store.Lng,
+		"delivery_lat": order.DeliveryLat,
+		"delivery_lng": order.DeliveryLng,
+		"items":        order.Items,
+		"total_amount": order.TotalAmount,
+	}, nil
 }

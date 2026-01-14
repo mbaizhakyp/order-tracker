@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/event"
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/handler"
+	"github.com/mbaizhakyp/order-tracker/internal/adapters/middleware"
 	"github.com/mbaizhakyp/order-tracker/internal/adapters/repository"
 	websocket_internal "github.com/mbaizhakyp/order-tracker/internal/adapters/websocket"
 	"github.com/mbaizhakyp/order-tracker/internal/core/config"
@@ -30,8 +31,16 @@ func main() {
 	// 3. Setup Dependencies
 	kafkaPublisher := event.NewKafkaEventPublisher(cfg.Kafka.Brokers)
 
+	// Store Service Setup (Moved up for OrderService dependency)
+	storeRepo := repository.NewPostgresStoreRepository(dbPool)
+	storeSvc := service.NewStoreService(storeRepo)
+	storeHandler := handler.NewStoreHandler(storeSvc)
+
+	// Dispatch repositories needed later
+	dispatchRepo := repository.NewPostgresDispatchRepository(dbPool)
+
 	orderRepo := repository.NewPostgresOrderRepository(dbPool)
-	orderSvc := service.NewOrderService(orderRepo, kafkaPublisher)
+	orderSvc := service.NewOrderService(orderRepo, storeRepo, kafkaPublisher)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 
 	// Start Auto-Cancellation Background Job
@@ -45,18 +54,12 @@ func main() {
 	locationHandler := handler.NewLocationHandler(locationSvc)
 
 	// Dispatch Service Setup
-	storeRepo := repository.NewPostgresStoreRepository(dbPool)
-	dispatchRepo := repository.NewPostgresDispatchRepository(dbPool)
 	dispatchSvc := service.NewDispatchService(storeRepo, locationRepo, dispatchRepo, orderRepo, kafkaPublisher)
 
 	// Auth Service Setup
 	userRepo := repository.NewPostgresUserRepository(dbPool)
 	authSvc := service.NewAuthService(userRepo, kafkaPublisher, cfg.Auth.JWTSecret)
 	authHandler := handler.NewAuthHandler(authSvc)
-
-	// Store Service Setup
-	storeSvc := service.NewStoreService(storeRepo)
-	storeHandler := handler.NewStoreHandler(storeSvc)
 
 	// Start Kafka Consumer (Dispatch Logic)
 	dispatchConsumer := event.NewKafkaConsumer(cfg.Kafka.Brokers, "orders.lifecycle", "dispatch-group", dispatchSvc)
@@ -122,11 +125,21 @@ func main() {
 			auth.POST("/login", authHandler.Login)
 		}
 
-		// Protected Routes (TODO: Apply Middleware using authSvc.JWTSecret)
-		// For now public to keep Simulator working until updated
+		// Protected Routes
+		protected := v1.Group("/")
+		protected.Use(middleware.AuthMiddleware(cfg.Auth.JWTSecret))
+		{
+			protected.POST("/auth/presence", authHandler.Presence)
+			protected.POST("/orders", orderHandler.CreateOrder)
+			protected.GET("/orders/active", orderHandler.GetShopperActiveOrder)
+			// Ideally protect these too, but keeping open for simulator ease for now except creation
+			// protected.POST("/orders/:id/claim", orderHandler.ClaimOrder)
+		}
+
+		// Public Order Routes (for Simulator/Demo access mostly, or read-only)
 		orderGroup := v1.Group("/orders")
 		{
-			orderGroup.POST("", orderHandler.CreateOrder)
+			// orderGroup.POST("", orderHandler.CreateOrder) // Moved to protected
 			orderGroup.GET("/:id", orderHandler.GetOrder)
 			orderGroup.POST("/:id/claim", orderHandler.ClaimOrder)
 			orderGroup.POST("/:id/arrive", orderHandler.ArriveAtStore)

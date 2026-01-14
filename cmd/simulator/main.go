@@ -26,8 +26,9 @@ const (
 	UpdateInterval = 200 * time.Millisecond
 	CenterLat      = 33.2098 // Tuscaloosa
 	CenterLng      = -87.5692
-	MovementSpeed  = 0.0004 // Restore original velocity (approx 800km/h demo speed) for 5Hz updates
-	ArrivalRadius  = 0.0010 // Approx 100m
+	BaseSpeed      = 0.0004        // Original velocity (approx 800km/h demo speed)
+	ActiveSpeed    = BaseSpeed * 2 // 2x Turbo speed when fulfilling orders
+	ArrivalRadius  = 0.0010        // Approx 100m
 )
 
 // Shopper State
@@ -86,6 +87,8 @@ func main() {
 	// 5. Main Simulation Loop
 	ticker := time.NewTicker(UpdateInterval)
 	defer ticker.Stop()
+
+	// Status Logger (Removed)
 
 	for range ticker.C {
 		updateShoppers()
@@ -294,8 +297,8 @@ func updateShoppers() {
 					log.Printf("Shopper %s cruising to new waypoint.", shopper.ID)
 				}
 
-				// 2. Cruise towards the random waypoint
-				moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, MovementSpeed)
+				// 2. Cruise towards the random waypoint (Base Speed)
+				moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, BaseSpeed)
 
 			case ModeDrivingToStore:
 				dist := distance(shopper.Lat, shopper.Lng, shopper.TargetLat, shopper.TargetLng)
@@ -304,7 +307,7 @@ func updateShoppers() {
 					shopper.Mode = ModeAtStore
 					go postAction(shopper.ActiveOrderID, "arrive")
 				} else {
-					moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, MovementSpeed)
+					moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, ActiveSpeed)
 				}
 
 			case ModeDrivingToCustomer:
@@ -314,7 +317,7 @@ func updateShoppers() {
 					shopper.Mode = ModeAtCustomer
 					go postAction(shopper.ActiveOrderID, "arrive_customer")
 				} else {
-					moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, MovementSpeed)
+					moveTowards(shopper, shopper.TargetLat, shopper.TargetLng, ActiveSpeed)
 				}
 
 			case ModeAtStore, ModeAtCustomer:

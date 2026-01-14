@@ -27,6 +27,28 @@ export default function CourierPage() {
 
         if (user.role === "SHOPPER" && !connectedId) {
             setConnectedId(user.id);
+
+            // Announce presence to simulator
+            api.post("/auth/presence").catch(err => console.error("Failed to announce presence", err));
+
+            // Check for active session
+            api.get("/orders/active")
+                .then(res => {
+                    if (res.data) {
+                        const order = res.data;
+                        console.log("Resumed active session:", order);
+                        setupActiveOrder({
+                            order_id: order.id,
+                            store_lat: order.store_lat,
+                            store_lng: order.store_lng,
+                            delivery_lat: order.delivery_lat,
+                            delivery_lng: order.delivery_lng,
+                        });
+                        // Also restore status which setupActiveOrder sets to CLAIMED by default usually
+                        setActiveOrder(prev => prev ? { ...prev, status: order.status } : null);
+                    }
+                })
+                .catch(err => console.error("Failed to check active session", err));
         }
     }, [user, connectedId, router]);
 
