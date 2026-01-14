@@ -10,7 +10,7 @@ This system handles order ingestion, real-time geospatial dispatching to nearby 
 ## 🚀 Key Features
 
 *   **Real-Time Geospatial Dispatching**: Uses **Redis Geo** to instantly find shoppers within a 15km radius of a store.
-*   **Event-Driven Architecture**: Decoupled services using **Apache Kafka** for asynchronous communication (Order Service -> Dispatch Service -> Notification Service).
+*   **Event-Driven Architecture**: Decoupled services using **Apache Kafka** ensures system reliability. If the Notification Service goes down, order processing continues uninterrupted, and messages are replayed upon recovery.
 *   **WebSocket Push Notifications**: Instantly pushes offers to connected shoppers via a WebSocket hub.
 *   **Concurrency Safe**: Implements **Atomic Order Claiming** using PostgreSQL Transactional Locking (`FOR UPDATE`) to prevent race conditions (double-booking).
 *   **Session Persistence**: Couriers can refresh their browser or re-login without losing their active delivery state.
@@ -202,5 +202,16 @@ Verified Clean Architecture (Port & Adapter Pattern):
 └── migrations       # Database Schema Versioning
 ```
 
-## 📝 License
+## � Future Roadmap & Production Considerations
+
+### 1. Observability (Metrics & Tracing)
+To operate at scale (like Shipt), visibility is critical.
+*   **Prometheus**: Expose `/metrics` endpoints to track Dispatch Latency (p99), Active Shopper Counts, and Order Throughput.
+*   **Distributed Tracing (OpenTelemetry)**: Trace request IDs (`X-Request-ID`) across Order -> Kafka -> Dispatcher -> WebSocket to debug latency bottlenecks.
+
+### 2. Infrastructure
+*   **Kubernetes (K8s) Deployment**: Move from Docker Compose to Helm charts for auto-scaling the Dispatch Service based on Kafka lag.
+*   **Dead Letter Queues (DLQ)**: Handle "poison pill" messages in Kafka to prevent consumer lag during failures.
+
+## �📝 License
 MIT
