@@ -4,12 +4,17 @@ A high-performance, event-driven logistics backend built with **Go**, **Kafka**,
 
 This system handles order ingestion, real-time geospatial dispatching to nearby shoppers, and atomic order claiming, simulating the core logistics engine of a delivery platform like Shipt or Instacart.
 
+## 🎥 Demo
+[![Demo Video](https://img.youtube.com/vi/dI_CtcXSh2s/0.jpg)](https://www.youtube.com/watch?v=dI_CtcXSh2s)
+
 ## 🚀 Key Features
 
 *   **Real-Time Geospatial Dispatching**: Uses **Redis Geo** to instantly find shoppers within a 15km radius of a store.
 *   **Event-Driven Architecture**: Decoupled services using **Apache Kafka** for asynchronous communication (Order Service -> Dispatch Service -> Notification Service).
 *   **WebSocket Push Notifications**: Instantly pushes offers to connected shoppers via a WebSocket hub.
 *   **Concurrency Safe**: Implements **Atomic Order Claiming** using PostgreSQL Transactional Locking (`FOR UPDATE`) to prevent race conditions (double-booking).
+*   **Session Persistence**: Couriers can refresh their browser or re-login without losing their active delivery state.
+*   **Smart Simulator**: Includes a dynamic "Ghost Car" simulator that mimics shopper behavior, automatically respawning specifically for the logged-in user for testing.
 *   **Scalable Design**: Built with modular Clean Architecture principles.
 
 ## 🛠️ Tech Stack
