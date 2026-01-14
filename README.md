@@ -1,8 +1,8 @@
-# 📦 Real-Time Distributed Order Tracker ("Shipt Clone" Backend)
+# 📦 Real-Time Distributed Order Tracker
 
 A high-performance, event-driven logistics backend built with **Go**, **Kafka**, **Redis**, and **PostgreSQL**.
 
-This system handles order ingestion, real-time geospatial dispatching to nearby shoppers, and atomic order claiming, simulating the core logistics engine of a delivery platform like Shipt or Instacart.
+This system handles order ingestion, real-time geospatial dispatching to nearby shoppers, and atomic order claiming, simulating the core logistics engine of a modern delivery platform.
 
 ## 🎥 Demo
 [![Demo Video](https://img.youtube.com/vi/dI_CtcXSh2s/0.jpg)](https://www.youtube.com/watch?v=dI_CtcXSh2s)
