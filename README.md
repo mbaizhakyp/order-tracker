@@ -143,13 +143,64 @@ curl -X POST http://localhost:8080/api/v1/orders/YOUR_ORDER_ID/claim \
   -d '{"shopper_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a34"}'
 ```
 
+## 🧩 Engineering Challenges & Solutions
+
+### 1. The "Ghost Car" Problem (Session Persistence)
+**Challenge**: In a stateless simulator, if a courier refreshed their page, the simulator would forget they existed, leaving them stranded on the map.
+**Solution**: Implemented a **Presence Protocol**. On mount, the frontend announces `SHOPPER_ONLINE` to the backend. The Simulator listens for this event and dynamically "spawns" or "adopts" the existing courier, resuming their state and route exactly where they left off.
+
+### 2. Atomic Order Claiming (Concurrency)
+**Challenge**: High-concurrency environments risk double-booking if two shoppers claim an order simultaneously.
+**Solution**: Leveraged PostgreSQL's pessimistic locking (`SELECT ... FOR UPDATE`).
+```sql
+BEGIN;
+SELECT status FROM orders WHERE id = $1 FOR UPDATE;
+-- Check status (must be OFFERED)
+UPDATE orders SET status = 'CLAIMED', shopper_id = $2 WHERE id = $1;
+COMMIT;
+```
+This ensures that even with millisecond-difference requests, only one transaction succeeds.
+
+### 3. Real-Time State Sync (The "Split Brain" Fix)
+**Challenge**: Keeping the Courier's UI, the Customer's receipt, and the Simulator in sync without polling.
+**Solution**: A consolidated **WebSocket Bridge**.
+*   **Source of Truth**: The Backend (PostgreSQL) is the only state authority.
+*   **Propagation**: Order updates publish to Kafka (`orders.lifecycle`).
+*   **Consumption**: A specific WebSocket consumer reads Kafka and pushes generic JSON payloads to the frontend.
+*   **Optimistic UI**: The frontend updates locally on user action, but reverts if the WebSocket confirmation doesn't arrive, ensuring perceived performance without data corruption.
+
+## 💻 Frontend Architecture (Next.js)
+
+The `web/` directory contains a sophisticated **Next.js 15** application designed for speed and interactivity.
+
+*   **Tech Stack**: Next.js, React Query, TailwindCSS, Lucide Icons.
+*   **State Management**: `React Query` for server state, `React Context` for Auth.
+*   **Map Integration**: Custom Google Maps wrapper handling markers, directions service, and real-time movement interpolation.
+*   **Optimistic Updates**: Immediate UI feedback for actions like "Claim Order", backed by eventual consistency via WebSocket updates.
+
 ## 📂 Project Structure
 
-*   `cmd/api`: Main REST API entrypoint.
-*   `cmd/simulator`: Shopper movement simulator.
-*   `internal/core`: Domain logic (Entities, Services, Ports).
-*   `internal/adapters`: Implementation details (Repositories, Handlers, Kafka Consumers).
-*   `migrations`: Database schema definitions.
+Verified Clean Architecture (Port & Adapter Pattern):
+
+```
+├── cmd
+│   ├── api          # Main REST API entrypoint
+│   └── simulator    # Autonomous Shopper Simulator
+├── internal
+│   ├── core         # Pure Domain Logic (No external dependencies)
+│   │   ├── entity   # Domain Models (Order, User, Store)
+│   │   ├── ports    # Interfaces (Repository & Service definitions)
+│   │   └── service  # Business Logic implementation
+│   └── adapters     # Infrastructure Implementation
+│       ├── handler  # HTTP Handlers (Gin)
+│       ├── repository # Postgres & Redis implementations
+│       └── event    # Kafka Producers & Consumers
+├── web              # Next.js Frontend Monorepo
+│   ├── src/app      # App Router (Shopper & Customer views)
+│   ├── src/components # Reusable UI & Map Components
+│   └── src/lib      # API Clients & Utilities
+└── migrations       # Database Schema Versioning
+```
 
 ## 📝 License
 MIT
